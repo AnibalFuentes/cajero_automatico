@@ -1,38 +1,47 @@
+import 'dart:async';
 import 'dart:math';
-
 import 'package:cajero_automatico/src/controllers/cuenta.dart';
 import 'package:cajero_automatico/src/models/cuenta.dart';
-import 'package:cajero_automatico/src/screens/cajero.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 class CajeroController extends GetxController {
   RxString text = ''.obs;
-  final int maxLengthNequi = 10; // Longitud máxima para Nequi
-  final int maxLengthBancolombia = 11; // Longitud máxima para Bancolombia
+  final int maxLengthNequi = 10;
+  final int maxLengthBancolombia = 11;
   RxInt index = 1.obs;
-  TipoCuenta? tipoCuentaSeleccionado; // Cambiado a TipoCuenta
-  Cuenta? cuentaValida; // Para almacenar la cuenta válida
+  TipoCuenta? tipoCuentaSeleccionado;
+  Cuenta? cuentaValida;
   final List<Cuenta> cuentas = Get.find<CuentaController>().cuentas;
-  RxDouble monto = 0.0.obs; // Para almacenar el monto seleccionado o ingresado
-  RxString codigoTemporal = ''.obs; // Para almacenar el código temporal
+  RxDouble monto = 0.0.obs;
+  RxString codigoTemporal = ''.obs;
   double saldoCajero = 0;
-
   List<double> billetesDisponibles = [0, 0, 0, 0];
   List<double> cantidadBilletes = [0, 0, 0, 0];
   List<double> billetes = [10000, 20000, 50000, 100000];
+  Timer? _timeoutTimer;
+
   CajeroController() {
     inicializarCajero();
   }
 
   void inicializarCajero() {
     for (int i = 0; i < 4; i++) {
-      billetesDisponibles[i] = 100; // Cantidad inicial de cada billete
-      saldoCajero +=
-          billetesDisponibles[i] * billetes[i]; // Calcular el saldo total
+      billetesDisponibles[i] = 100;
+      saldoCajero += billetesDisponibles[i] * billetes[i];
     }
-    print('Saldo en el cajero: $saldoCajero'); // Muestra el saldo en consola
+    print('Saldo en el cajero: $saldoCajero');
+  }
+
+  String generarMensajeBilletesRetirados() {
+    StringBuffer sb = StringBuffer();
+    for (int i = 0; i < 4; i++) {
+      if (cantidadBilletes[i] > 0) {
+        sb.writeln(
+            '\$${billetes[i].toStringAsFixed(0)} = ${cantidadBilletes[i]}');
+      }
+    }
+    return sb.toString();
   }
 
   void realizarRetiro(double monto) {
@@ -41,7 +50,6 @@ class CajeroController extends GetxController {
     }
 
     double suma = 0;
-
     while (suma < monto) {
       for (var i = 0; i < 4; i++) {
         for (var j = i; j < 4; j++) {
@@ -49,14 +57,19 @@ class CajeroController extends GetxController {
             suma += billetes[j];
             cantidadBilletes[j]++;
             billetesDisponibles[j]--;
-            if (suma == monto) {
-              break;
-            } // Salir del ciclo
+            if (suma == monto) break;
           }
         }
       }
     }
-    imprimirBilletesRetirados();
+    String mensajeBilletes = generarMensajeBilletesRetirados();
+
+    Get.snackbar(
+      'Retirando',
+      'Monto: $getMontoFormateado\n\nBilletes:\n$mensajeBilletes',
+      snackPosition: SnackPosition.TOP,
+      duration: const Duration(seconds: 8),
+    );
   }
 
   void updateText(String number) {
@@ -73,13 +86,11 @@ class CajeroController extends GetxController {
 
   String get formattedNumeroCuenta {
     if (cuentaValida == null) return 'No disponible';
-
     String numeroCuenta = cuentaValida!.numeroCuenta;
 
-    // Verificar si es una cuenta de Nequi y tiene un 0 al principio
     if (tipoCuentaSeleccionado == TipoCuenta.nequi &&
         numeroCuenta.startsWith('0')) {
-      return numeroCuenta.substring(1); // Eliminar el 0 al mostrar
+      return numeroCuenta.substring(1);
     }
 
     return numeroCuenta;
@@ -92,8 +103,9 @@ class CajeroController extends GetxController {
   void cancel() {
     text.value = '';
     monto.value = 0;
-    index.value = 1; // Regresar a la pantalla inicial
+    index.value = 1;
     showAlert('Acción Cancelada');
+    _resetTimeout();
   }
 
   void deleteOne() {
@@ -109,10 +121,11 @@ class CajeroController extends GetxController {
   }
 
   void send() {
+    _resetTimeout();
     switch (index.value) {
       case 1:
         if (text.isNotEmpty) {
-          index.value = 2; // Cambiar a la pantalla de número de cuenta
+          index.value = 2;
           text.value = '';
         }
         break;
@@ -120,7 +133,6 @@ class CajeroController extends GetxController {
         if (text.isNotEmpty) {
           String numeroCuenta = text.value;
 
-          // Validar el formato del número de cuenta según el tipo de cuenta
           if (tipoCuentaSeleccionado == TipoCuenta.nequi) {
             if (!numeroCuenta.startsWith('3') ||
                 numeroCuenta.length != maxLengthNequi) {
@@ -128,8 +140,7 @@ class CajeroController extends GetxController {
                   'El número de cuenta para Nequi debe comenzar con 3 y tener 10 dígitos.');
               return;
             }
-            numeroCuenta =
-                '0$numeroCuenta'; // Agregar un 0 al inicio si es Nequi
+            numeroCuenta = '0$numeroCuenta';
           } else if (tipoCuentaSeleccionado == TipoCuenta.bancolombia) {
             if (numeroCuenta.isEmpty ||
                 !numeroCuenta.startsWith(RegExp(r'[1-9]')) ||
@@ -147,7 +158,7 @@ class CajeroController extends GetxController {
           );
 
           if (cuentaValida != null) {
-            index.value = 3; // Cambiar a la pantalla de selección de monto
+            index.value = 3;
             text.value = '';
           } else {
             Get.snackbar('Cuenta incorrecta',
@@ -165,8 +176,8 @@ class CajeroController extends GetxController {
             'Monto inválido. Debe ser múltiplo de 10,000 y estar entre 10,000 y 600,000.',
           );
         } else {
-          monto.value = montoIngresado; // Guardar el monto ingresado
-          index.value = 5; // Cambiar a la pantalla de ingreso de código o clave
+          monto.value = montoIngresado;
+          index.value = 5;
           text.value = '';
         }
         break;
@@ -180,16 +191,13 @@ class CajeroController extends GetxController {
             'Monto inválido. Debe ser múltiplo de 10,000 y estar entre 10,000 y 600,000.',
           );
         } else {
-          monto.value = montoIngresado; // Guardar el monto ingresado
-          index.value = 5; // Cambiar a la pantalla de ingreso de código o clave
+          monto.value = montoIngresado;
+          index.value = 5;
           text.value = '';
         }
-        // Generar un código para cuentas Nequi
-
         break;
       case 5:
-        index.value =
-            6; // Cambiar a la pantalla de validación de código o clave
+        index.value = 6;
         text.value = '';
         if (tipoCuentaSeleccionado == TipoCuenta.nequi) {
           final random = Random();
@@ -197,13 +205,13 @@ class CajeroController extends GetxController {
           String generatedCode = 'CODE-${codigo}';
           cuentaValida?.code = codigo.toString();
           codigoTemporal.value = codigo.toString();
-          update(); // Actualiza los datos en el controlador
+          update();
 
           Get.snackbar(
             'Código Generado',
             'Código: $generatedCode',
             snackPosition: SnackPosition.TOP,
-            duration: Duration(seconds: 8),
+            duration: const Duration(seconds: 8),
           );
         }
         break;
@@ -212,54 +220,52 @@ class CajeroController extends GetxController {
           if (text.value == cuentaValida?.code &&
               monto <= cuentaValida!.saldo &&
               monto <= saldoCajero) {
-            Get.snackbar('Código Validado', 'Retirando');
             realizarRetiro(monto.value);
             cuentaValida?.saldo -= monto.value;
-
-            // Realizar la acción deseada
             cuentaValida?.code = null;
-            // Invalidate the code after use
-            update(); // Update the controller
+            update();
             index.value = 7;
           } else if (text.value != cuentaValida?.code) {
             Get.snackbar(
                 'Código Incorrecto', 'El código ingresado es incorrecto.');
-            cuentaValida?.code = null;
-            index.value = 1;
-          } else if (monto >= cuentaValida!.saldo) {
+          } else if (monto >= cuentaValida!.saldo  &&  cuentaValida!.saldo!=0) {
             Get.snackbar('Saldo insuficiente',
                 'Su retiro no puede ser mayor a su saldo que es ${cuentaValida!.saldo}',
-                duration: Duration(seconds: 8));
+                duration: const Duration(seconds: 3));
             index.value = 3;
           } else if (monto > saldoCajero) {
             Get.snackbar('Saldo insuficiente cajero',
                 'Lo siento, no puede retirar ese monto solo tenemos ${saldoCajero}',
-                duration: Duration(seconds: 8));
+                duration: const Duration(seconds: 8));
             index.value = 3;
+          }else if(cuentaValida!.saldo==0){
+            Get.snackbar('Saldo insuficiente',
+                'su cuenta no tiene saldo',
+                duration: const Duration(seconds: 3));
+
+            index.value = 1;
+
           }
         } else if (tipoCuentaSeleccionado == TipoCuenta.bancolombia) {
-          // Validar clave para Bancolombia
           if (text.value == cuentaValida?.clave &&
               monto <= cuentaValida!.saldo &&
               monto <= saldoCajero) {
-            Get.snackbar('Info Cajero', 'Retirando....');
             realizarRetiro(monto.value);
-
             cuentaValida?.saldo -= monto.value;
             update();
             index.value = 7;
           } else if (text.value != cuentaValida?.clave) {
             Get.snackbar(
-                'clave incorecta', 'la clave ingresada es incorrecto.');
-          } else if (monto > cuentaValida!.saldo) {
+                'Clave incorrecta', 'La clave ingresada es incorrecta.');
+          } else if (monto >= cuentaValida!.saldo) {
             Get.snackbar('Saldo insuficiente',
                 'Su retiro no puede ser mayor a su saldo que es ${cuentaValida!.saldo}',
-                duration: Duration(seconds: 8));
+                duration: const Duration(seconds: 3));
             index.value = 3;
           } else if (monto > saldoCajero) {
             Get.snackbar('Saldo insuficiente cajero',
                 'Lo siento, no puede retirar ese monto solo tenemos ${saldoCajero}',
-                duration: Duration(seconds: 6));
+                duration: const Duration(seconds: 6));
             index.value = 3;
           }
         }
@@ -267,53 +273,49 @@ class CajeroController extends GetxController {
         break;
       case 7:
         index.value = 8;
-
+        Get.snackbar(
+          'Gracias por usar nuestros servicios',
+          'Retiro exitoso',
+          duration: const Duration(seconds: 3),
+        );
         break;
       case 8:
         index.value = 1;
-        break;
-
-      default:
+        text.value = '';
+        tipoCuentaSeleccionado = null;
+        cuentaValida = null;
         break;
     }
   }
 
-  void imprimirBilletesRetirados() {
-    for (int i = 0; i < 4; i++) {
-      if (cantidadBilletes[i] > 0) {
-        // ignore: avoid_print
-        print(
-          'Billetes de \$${billetes[i].toInt()}: ${cantidadBilletes[i].toInt()} = ${(billetes[i] * cantidadBilletes[i]).toInt()}',
-        );
-      }
-    }
-  }
-
-  String formatMonto(String monto) {
-    try {
-      // Elimina caracteres no numéricos
-      final cleanText = monto.replaceAll(RegExp(r'[^\d]'), '');
-      final number = int.parse(cleanText);
-      return NumberFormat('#,###').format(number);
-    } catch (e) {
-      return monto; // Si ocurre un error, devuelve el texto original
-    }
+  String get getMontoFormateado {
+    final formatter =
+        NumberFormat.currency(locale: 'es_CO', decimalDigits: 0, symbol: '\$');
+    return formatter.format(monto.value);
   }
 
   void showAlert(String message) {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Advertencia'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Get.back();
-            },
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+    Get.snackbar(
+      'Advertencia',
+      message,
+      snackPosition: SnackPosition.TOP,
+      duration: const Duration(seconds: 8),
     );
+  }
+
+  void _startTimeout() {
+    _timeoutTimer?.cancel();
+    _timeoutTimer = Timer(const Duration(seconds: 15), () {
+      if (index.value != 1) {
+        Get.snackbar('Operación Finalizada',
+            'La operación ha sido finalizada por inactividad.');
+        index.value = 1;
+        text.value = '';
+      }
+    });
+  }
+
+  void _resetTimeout() {
+    _startTimeout();
   }
 }

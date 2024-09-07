@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // Importar el paquete intl
+import 'package:intl/intl.dart';
 import 'package:get/get.dart';
 import 'package:cajero_automatico/src/controllers/cajero.dart';
 import 'package:cajero_automatico/src/models/cuenta.dart';
@@ -31,14 +31,14 @@ class Cajero extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.blue.shade900,
                     ),
-                    child: Obx(() => _buildScreen()),
+                    child: Obx(() => screens()),
                   ),
                 ),
                 Expanded(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildNumberPad(wScreen),
+                      tecladoNumerico(wScreen),
                       const SizedBox(width: 20),
                       botonesControl(),
                     ],
@@ -52,7 +52,7 @@ class Cajero extends StatelessWidget {
     );
   }
 
-  Widget _buildScreen() {
+  Widget screens() {
     switch (controller.index.value) {
       case 1:
         return seleccionarCuenta();
@@ -95,6 +95,7 @@ class Cajero extends StatelessWidget {
             () => TextFormField(
               controller: TextEditingController(text: controller.text.value),
               readOnly: true,
+              obscureText: true,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
               ),
@@ -121,7 +122,7 @@ class Cajero extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('RECIBO:\n'),
+          const Text('RECIBO:\n'),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -395,19 +396,17 @@ class Cajero extends StatelessWidget {
           children: [
             Expanded(
               child: Column(
-                children:
-                    montos1.map((monto) => _buildAmountButton(monto)).toList(),
+                children: montos1.map((monto) => montoFijo(monto)).toList(),
               ),
             ),
             const SizedBox(width: 20),
             Expanded(
               child: Column(
                 children: [
-                  ...montos2.map((monto) => _buildAmountButton(monto)).toList(),
+                  ...montos2.map((monto) => montoFijo(monto)).toList(),
                   GestureDetector(
                     onTap: () {
-                      controller.index.value =
-                          4; // Ir a la pantalla de ingresar otro monto
+                      controller.index.value = 4;
                       controller.text.value = '';
                     },
                     child: Container(
@@ -434,10 +433,10 @@ class Cajero extends StatelessWidget {
     );
   }
 
-  Widget _buildAmountButton(double monto) {
+  Widget montoFijo(double monto) {
     return GestureDetector(
       onTap: () {
-        controller.monto.value = monto; // Guardar el monto seleccionado
+        controller.monto.value = monto;
         controller.index.value = 5;
       },
       child: Container(
@@ -493,7 +492,7 @@ class Cajero extends StatelessWidget {
     );
   }
 
-  Widget _buildNumberPad(double wScreen) {
+  Widget tecladoNumerico(double wScreen) {
     return Container(
       margin: const EdgeInsets.all(16.0),
       width: wScreen > 600 ? 200 : wScreen * 0.4,
@@ -550,12 +549,11 @@ class Cajero extends StatelessWidget {
   }
 
   Widget botonesControl() {
-    // Lista de colores para la línea debajo del texto de los botones
     final List<Color> underlineColors = [
-      Colors.red, // Rojo para Cancelar
-      Colors.yellow, // Amarillo para Corregir
-      Colors.yellow, // Amarillo para Borrar
-      Colors.green, // Verde para Enviar
+      Colors.red,
+      Colors.yellow,
+      Colors.yellow,
+      Colors.green,
     ];
 
     return Container(
@@ -585,8 +583,8 @@ class Cajero extends StatelessWidget {
               padding: const EdgeInsets.all(10),
               margin: const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100, // Relleno gris claro
-                border: Border.all(color: Colors.grey), // Bordes grises
+                color: Colors.grey.shade100,
+                border: Border.all(color: Colors.grey),
                 borderRadius: BorderRadius.circular(5),
               ),
               child: Column(
@@ -594,13 +592,12 @@ class Cajero extends StatelessWidget {
                 children: [
                   Text(
                     ['CANCEL', 'CORRECT', 'DELETE', 'ENTER'][index],
-                    style: TextStyle(color: Colors.black), // Color del texto
+                    style: const TextStyle(color: Colors.black),
                   ),
-                  const SizedBox(
-                      height: 4), // Espacio entre el texto y la línea
+                  const SizedBox(height: 4),
                   Container(
-                    height: 2, // Altura de la línea
-                    color: underlineColors[index], // Color de la línea
+                    height: 2,
+                    color: underlineColors[index],
                   ),
                 ],
               ),
